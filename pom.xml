@@ -49,6 +49,41 @@
 
 	<build>
 		<plugins>
+			<!--使用jib插件-->
+			<plugin>
+				<!-- https://mvnrepository.com/artifact/com.google.cloud.tools/jib-maven-plugin -->
+				<groupId>com.google.cloud.tools</groupId>
+				<artifactId>jib-maven-plugin</artifactId>
+				<version>1.6.1</version>
+				<configuration>
+					<!--from节点用来设置镜像的基础镜像，相当于Docerkfile中的FROM关键字-->
+					<from>
+						<!--使用openjdk官方镜像-->
+						<image>openjdk:alpine</image>
+					</from>
+					<to>
+						<!--镜像名称和tag，使用了mvn内置变量${project.version}，表示当前工程的version-->
+						<!--                        <image>helloworld/alfred:jibtest:${project.version}</image>-->
+						<image>wangzz2017/springapm:1</image>
+					</to>
+					<!--容器相关的属性-->
+					<container>
+						<!--jvm内存参数-->
+						<jvmFlags>
+							<!--
+							<jvmFlag>-Xms4g</jvmFlag>
+							<jvmFlag>-Xmx4g</jvmFlag>
+							-->
+							<jvmFlag>-javaagent:dd-java-agent.jar</jvmFlag>
+						</jvmFlags>
+						<!--要暴露的端口-->
+						<ports>
+							<port>8080</port>
+						</ports>
+						<creationTime>USE_CURRENT_TIMESTAMP</creationTime>
+					</container>
+				</configuration>
+			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
