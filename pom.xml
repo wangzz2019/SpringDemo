@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
@@ -17,8 +17,12 @@
 	<properties>
 		<java.version>1.8</java.version>
 	</properties>
-
 	<dependencies>
+		<dependency>
+			<groupId>com.google.cloud</groupId>
+			<artifactId>google-cloud-spanner-jdbc</artifactId>
+			<version>2.4.2</version>
+		</dependency>
 		<dependency>
 			<groupId>io.opentracing</groupId>
 			<artifactId>opentracing-util</artifactId>
@@ -90,7 +94,7 @@
 					<to>
 						<!--镜像名称和tag，使用了mvn内置变量${project.version}，表示当前工程的version-->
 						<!--                        <image>helloworld/alfred:jibtest:${project.version}</image>-->
-						<image>wangzz2017/springapm:1</image>
+						<image>wangzz2017/springdemo:apm</image>
 					</to>
 					<!--容器相关的属性-->
 					<container>
@@ -102,6 +106,9 @@
 							-->
 							<jvmFlag>-javaagent:dd-java-agent.jar</jvmFlag>
 						</jvmFlags>
+						<environment>
+							<DD_AGENT_HOST>172.17.0.1</DD_AGENT_HOST>
+						</environment>
 						<!--要暴露的端口-->
 						<ports>
 							<port>8080</port>
