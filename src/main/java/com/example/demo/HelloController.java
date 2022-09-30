@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import io.opentracing.propagation.TextMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.messaging.Message;
@@ -20,11 +21,10 @@ import org.apache.kafka.common.header.internals.*;
 
 import datadog.trace.api.DDTags;
 import datadog.opentracing.DDTracer;
-import io.opentracing.Tracer;
+//import io.opentracing.Tracer;
 import io.opentracing.*;
-import io.opentracing.Scope;
-import io.opentracing.util.GlobalTracer;
-import io.opentracing.util.GlobalTracer;
+//import io.opentracing.Scope;
+//import io.opentracing.util.GlobalTracer;
 import datadog.trace.api.CorrelationIdentifier;
 import datadog.trace.api.Trace;
 import datadog.opentracing.DDTracer;
@@ -36,6 +36,20 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
+
+import java.net.http.*;
+import java.util.HashMap;
+import java.util.Random;
+import java.util.List;
+import java.util.Map;
+
+//add on 09/29 by wangzz
+import io.opentracing.Scope;
+import io.opentracing.Tracer;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
+import io.opentracing.propagation.Format;
+import io.opentracing.propagation.TextMapAdapter;
 
 
 @Controller
@@ -137,6 +151,93 @@ public class HelloController {
         kafkaTemplate.send(record);
         return "send message with header";
     }
+
+    @RequestMapping(value = "/javahttpclient",method = RequestMethod.GET)
+    @ResponseBody
+    public String javahttpclient() throws Exception{
+        String endpoint="http://18.180.59.191:8080/test";
+        java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+        java.net.http.HttpRequest.Builder builder=java.net.http.HttpRequest.newBuilder().uri(URI.create(endpoint));
+        builder.header("sender","jack");
+//        java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder().uri(URI.create(endpoint)).build();
+        java.net.http.HttpRequest request =builder.build();
+//        System.out.println(request.headers());
+        logger.info("using httpclient to send request");
+        HttpHeaders headers=request.headers();
+        logger.info(headers.toString());
+        java.net.http.HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+
+        Random r=new java.util.Random();
+        int intRandom=r.nextInt(10);
+        logger.info("intRandom is " + intRandom);
+        if (intRandom < 0) {
+            logger.info("log response body");
+            return response.body();
+        }
+        else {
+            logger.info("throw new exception");
+//            throw new Exception(new RuntimeException());
+            final Span span=GlobalTracer.get().activeSpan();
+            try {
+                tryException();
+            }
+            catch(Exception e){
+                logger.info("I catch the exception");
+                String exceptionStackTrace="";
+                if (span !=null){
+                    StackTraceElement[] stackTraceElements = new Throwable().getStackTrace();
+                    for (int i = 0; i < stackTraceElements.length; i++) {
+                        StackTraceElement ste=stackTraceElements[i];
+                        exceptionStackTrace += ste.getClassName() + ste.getMethodName() + "\n";
+                    }
+                    span.setTag("exceptionStackTrace",exceptionStackTrace);
+                }
+            }
+            finally{
+//                response.headers("httpcode");
+                return response.body();
+            }
+        }
+    }
+
+    private void tryException() throws Exception {
+        throw new Exception(new RuntimeException());
+    }
+
+    @RequestMapping(value = "/javahttpclient2",method = RequestMethod.GET)
+    @ResponseBody
+    public String javahttpclient2() throws Exception{
+        Tracer tracer=GlobalTracer.get();
+        Span span=tracer.buildSpan("httpClientSpan").start();
+        Scope scope=tracer.activateSpan(span);
+
+
+        String endpoint="http://18.180.59.191:8080/test";
+        java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+        java.net.http.HttpRequest.Builder builder=java.net.http.HttpRequest.newBuilder().uri(URI.create(endpoint));
+        builder.header("sender","jack");
+//        java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder().uri(URI.create(endpoint)).build();
+//        java.net.http.HttpRequest request =builder.build();
+//        System.out.println(request.headers());
+        logger.info("using httpclient to send request");
+
+
+        span.setTag(DDTags.RESOURCE_NAME,"PATH");
+        TextMap textMap=new TextMapAdapter(new HashMap<String,String>());
+        tracer.inject(span.context(),Format.Builtin.HTTP_HEADERS,textMap);
+        textMap.forEach( (header) ->
+                builder.header(header.getKey().toString(),header.getValue().toString()));
+
+
+//        HttpHeaders headers=request.headers();
+//        logger.info(headers.toString());
+//        Map<String, List<String>> headerMap=new java.util.HashMap<>(headers.map());
+        java.net.http.HttpRequest request =builder.build();
+        java.net.http.HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        span.finish();
+        return response.body();
+    }
+
 
     @RequestMapping(value = "/callothers",method = RequestMethod.GET)
     @ResponseBody
