@@ -13,6 +13,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
+
+import java.io.IOException;
 import java.net.URI;
 
 import org.springframework.kafka.core.KafkaTemplate;
@@ -50,6 +52,8 @@ import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMapAdapter;
+
+import javax.servlet.http.HttpServletResponse;
 
 
 @Controller
@@ -212,7 +216,7 @@ public class HelloController {
         Scope scope=tracer.activateSpan(span);
 
 
-        String endpoint="http://18.180.59.191:8080/test";
+        String endpoint="http://35.74.62.42:8080/test";
         java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
         java.net.http.HttpRequest.Builder builder=java.net.http.HttpRequest.newBuilder().uri(URI.create(endpoint));
         builder.header("sender","jack");
@@ -242,11 +246,30 @@ public class HelloController {
     @RequestMapping(value = "/callothers",method = RequestMethod.GET)
     @ResponseBody
     public String callothers(){
-        String endpoint="http://18.180.59.191:8081/test";
+        String endpoint="http://35.74.62.42:8080/test";
         URI uri= UriComponentsBuilder.fromHttpUrl(endpoint).build().encode().toUri();
         RestTemplate restTemplate=new RestTemplate();
         String data=restTemplate.getForObject(uri,String.class);
         System.out.println(data);
         return "test";
     }
+
+    @RequestMapping(value = "/errtest",method = RequestMethod.GET)
+    @ResponseBody
+    public String errtest(HttpServletResponse response) throws IOException {
+        int i=10;
+        int retInt;
+//        retInt=i/0;
+        try{
+            retInt=i/0;
+        }catch (Exception e){
+            retInt=11;
+            //even the exception is caught, we still want to response 500 code
+            response.setStatus(500);
+//            response.getWriter().append("divided by 0 error");
+        }
+
+        return "error happened and i is " + retInt;
+    }
+
 }
