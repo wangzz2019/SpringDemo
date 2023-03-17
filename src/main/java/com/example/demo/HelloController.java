@@ -1,9 +1,9 @@
 package com.example.demo;
 
 import io.opentracing.propagation.TextMap;
+import okhttp3.Request;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.support.SendResult;
-import org.springframework.messaging.Message;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.concurrent.ListenableFuture;
 import org.springframework.web.bind.annotation.*;
@@ -54,7 +54,15 @@ import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMapAdapter;
 
 import javax.servlet.http.HttpServletResponse;
-
+import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.comprehend.ComprehendClient;
+import software.amazon.awssdk.services.comprehend.model.DetectDominantLanguageRequest;
+import software.amazon.awssdk.services.comprehend.model.DetectDominantLanguageResponse;
+import software.amazon.awssdk.services.comprehend.model.DominantLanguage;
+import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.model.*;
 
 @Controller
 public class HelloController {
@@ -67,6 +75,48 @@ public class HelloController {
     public String sayHello() {
         return CombineString();
     }
+
+    @RequestMapping(value="/receivesqs",method = RequestMethod.GET)
+    @ResponseBody
+    public String Receivefromsqs(){
+        String retMessage="";
+        SqsClient sqsClient=SqsClient.builder().region(Region.AP_NORTHEAST_1).credentialsProvider(ProfileCredentialsProvider.create()).build();
+        try{
+            GetQueueUrlRequest getQueueRequest = GetQueueUrlRequest.builder()
+                    .queueName("jackqueue")
+                    .build();
+            String queueUrl=sqsClient.getQueueUrl(getQueueRequest).queueUrl();
+            ReceiveMessageRequest rmq=ReceiveMessageRequest.builder().queueUrl(queueUrl).maxNumberOfMessages(10).waitTimeSeconds(5).build();
+            ReceiveMessageResponse response = sqsClient.receiveMessage(rmq);
+            List<Message> messages=response.messages();
+
+            for(Message s : messages){
+                retMessage = s.body();
+                DeleteMessageRequest dmr=DeleteMessageRequest.builder().queueUrl("jackqueue").receiptHandle(s.receiptHandle()).build();
+                sqsClient.deleteMessage(dmr);
+                System.out.println(s.body());
+            }
+
+//            response.messages().forEach(message -> {
+//                System.out.printf(
+//                        "receive message = [%s], message-id = [%s], receipt-handle=[%s]%n",
+//                        message.body(),
+//                        message.messageId(),
+//                        message.receiptHandle()
+//                );}
+//
+//            );
+            return retMessage;
+        }catch (SqsException e){
+            e.getStackTrace();
+            e.printStackTrace();
+        }
+        finally{
+            return retMessage;
+        }
+
+    }
+
     private String CombineString(){
         String s1="Hello";
         String s2="This is Jack's Web created by Spring boot";
@@ -75,7 +125,35 @@ public class HelloController {
         //System.out.println("there is the console message from GET /hello");
         return s1 + ", " + s2;
     }
+    @RequestMapping(value = "/sendtosqs/{message}",method = RequestMethod.GET)
+    @ResponseBody
+    public String sendtosqs(@PathVariable("message") String message){
+        //String strMessage=@PathVariable("message");
+        SqsClient sqsClient=SqsClient.builder().region(Region.AP_NORTHEAST_1).credentialsProvider(ProfileCredentialsProvider.create()).build();
+        try{
+            GetQueueUrlRequest getQueueRequest = GetQueueUrlRequest.builder()
+                    .queueName("jackqueue")
+                    .build();
+            String queueUrl=sqsClient.getQueueUrl(getQueueRequest).queueUrl();
+            SendMessageRequest sendMsgRequest = SendMessageRequest.builder()
+                    .queueUrl(queueUrl)
+//                    .messageAttributes(myMap)
+//                    .messageGroupId("GroupA_"+lanCode)
+//                    .messageDeduplicationId(msg.getId())
+//                    .messageBody(msg.getBody())
+                    .messageBody(message)
+                    .build();
 
+            sqsClient.sendMessage(sendMsgRequest);
+            return "message sent to sqs with " + message;
+        }catch(SqsException e){
+            e.getStackTrace();
+            e.printStackTrace();
+        }
+        finally{
+            return "message sent to sqs " + message;
+        }
+    }
     @RequestMapping(value = "/spanner",method = RequestMethod.GET)
     @ResponseBody
     //@Trace(resourceName="/spanner")
